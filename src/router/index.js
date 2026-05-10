@@ -5,7 +5,8 @@ const routes = [
   { path: '/detail/:type/:id', name: 'Detail', component: () => import('@/views/DetailView.vue') },
   { path: '/message', name: 'Message', component: () => import('@/views/MessageView.vue') },
   { path: '/about', name: 'About', component: () => import('@/views/AboutView.vue') },
-  { path: '/search', name: 'Search', component: () => import('@/views/SearchView.vue') }
+  { path: '/search', name: 'Search', component: () => import('@/views/SearchView.vue') },
+  { path: '/admin', name: 'Admin', component: () => import('@/views/AdminView.vue') }
 ]
 
 const router = createRouter({
