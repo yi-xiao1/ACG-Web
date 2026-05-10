@@ -27,17 +27,6 @@ npm run dev
 
 启动后在浏览器打开终端输出的地址（默认 http://localhost:5173）。
 
-### 生产构建
-
-```bash
-npm run build
-```
-
-### 预览生产构建
-
-```bash
-npm run preview
-```
 
 ## 首页数据添加
 
