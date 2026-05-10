@@ -32,6 +32,23 @@ const filtered = computed(() => {
   )
 })
 
+// ── GitHub 配置 ──
+const showSettings = ref(false)
+const ghToken = ref(localStorage.getItem('gh_token') || '')
+const ghOwner = ref(localStorage.getItem('gh_owner') || '')
+const ghRepo = ref(localStorage.getItem('gh_repo') || '')
+const ghBranch = ref(localStorage.getItem('gh_branch') || 'main')
+const loading = ref(false)
+
+function saveSettings() {
+  localStorage.setItem('gh_token', ghToken.value)
+  localStorage.setItem('gh_owner', ghOwner.value)
+  localStorage.setItem('gh_repo', ghRepo.value)
+  localStorage.setItem('gh_branch', ghBranch.value)
+  showSettings.value = false
+}
+
+// ── 表单 ──
 const showForm = ref(false)
 const editing = ref(null)
 const form = ref({})
@@ -62,22 +79,116 @@ function closeForm() {
   editing.value = null
 }
 
-/* ===== 接口存根 ===== */
-function save() {
-  const action = editing.value ? '编辑' : '新增'
-  console.log(`【${action}】`, form.value)
-  alert(`已提交${action}请求：${form.value.title}\n（接口未实现，请对接后端保存到 Markdown 文件）`)
-  closeForm()
+// ── GitHub API ──
+const GH_API = 'https://api.github.com'
+
+function buildContent(f) {
+  const tags = f.tags
+    ? '[' + f.tags.split(',').map(t => `"${t.trim()}"`).join(', ') + ']'
+    : '[]'
+  return `---
+title: "${f.title}"
+cover: "${f.cover}"
+tags: ${tags}
+publishDate: "${f.publishDate}"
+url: "${f.url}"
+type: "${f.type}"
+id: "${f.id}"
+---
+
+${f.body}`
 }
-function remove(w) {
-  if (!confirm(`确定删除「${w.title}」？`)) return
-  console.log('【删除】', { type: w.type, id: w.id })
-  alert(`已提交删除请求：${w.title}\n（接口未实现，请对接后端删除 Markdown 文件）`)
+
+async function ghRequest(method, path, body) {
+  const res = await fetch(`${GH_API}${path}`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${ghToken.value}`,
+      Accept: 'application/vnd.github+json',
+      'Content-Type': 'application/json'
+    },
+    body: body ? JSON.stringify(body) : undefined
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.message || `HTTP ${res.status}`)
+  }
+  return res.json()
+}
+
+async function getFileSha(filePath) {
+  try {
+    const data = await ghRequest('GET', `/repos/${ghOwner.value}/${ghRepo.value}/contents/${filePath}?ref=${ghBranch.value}`)
+    return data.sha
+  } catch {
+    return null
+  }
+}
+
+async function save() {
+  if (!ghToken.value || !ghOwner.value || !ghRepo.value) {
+    alert('请先在设置中配置 GitHub 信息')
+    showSettings.value = true
+    return
+  }
+  if (!form.value.title || !form.value.id) {
+    alert('标题和 ID 为必填项')
+    return
+  }
+
+  const filePath = `src/data/${form.value.type}/${form.value.id}.md`
+  const content = btoa(unescape(encodeURIComponent(buildContent(form.value))))
+  const action = editing.value ? '编辑' : '新增'
+  loading.value = true
+
+  try {
+    const sha = editing.value ? await getFileSha(filePath) : undefined
+    await ghRequest('PUT', `/repos/${ghOwner.value}/${ghRepo.value}/contents/${filePath}`, {
+      message: `${action}作品：${form.value.title}`,
+      content,
+      sha,
+      branch: ghBranch.value
+    })
+    alert(`${action}成功！请刷新页面查看变更（Cloudflare Pages 部署可能需要几分钟）`)
+    closeForm()
+  } catch (e) {
+    alert(`操作失败：${e.message}`)
+  } finally {
+    loading.value = false
+  }
+}
+
+async function remove(w) {
+  if (!confirm(`确定删除「${w.title}」？此操作不可撤销。`)) return
+  if (!ghToken.value || !ghOwner.value || !ghRepo.value) {
+    alert('请先在设置中配置 GitHub 信息')
+    showSettings.value = true
+    return
+  }
+
+  const filePath = `src/data/${w.type}/${w.id}.md`
+  loading.value = true
+
+  try {
+    const sha = await getFileSha(filePath)
+    if (!sha) throw new Error('文件不存在')
+    await ghRequest('DELETE', `/repos/${ghOwner.value}/${ghRepo.value}/contents/${filePath}`, {
+      message: `删除作品：${w.title}`,
+      sha,
+      branch: ghBranch.value
+    })
+    alert(`删除成功！请刷新页面查看变更（Cloudflare Pages 部署可能需要几分钟）`)
+  } catch (e) {
+    alert(`操作失败：${e.message}`)
+  } finally {
+    loading.value = false
+  }
 }
 </script>
 
 <template>
   <div class="admin">
+    <!-- 密码门 -->
     <div v-if="!authed" class="gate">
       <form class="gate-card" @submit.prevent="tryAuth">
         <h2>管理员验证</h2>
@@ -86,6 +197,7 @@ function remove(w) {
       </form>
     </div>
 
+    <!-- 管理面板 -->
     <div v-else class="panel">
       <header>
         <h1>数据管理</h1>
@@ -103,10 +215,20 @@ function remove(w) {
 
       <div class="toolbar">
         <input v-model="search" placeholder="搜索标题或标签..." />
-        <button class="btn primary" @click="openAdd">+ 新增</button>
+        <button class="btn primary" @click="openAdd" :disabled="loading">+ 新增</button>
+        <button class="btn" @click="showSettings = true">⚙ 设置</button>
       </div>
 
-      <table v-if="filtered.length">
+      <div v-if="ghToken && ghOwner && ghRepo" class="gh-status">
+        已连接到 <strong>{{ ghOwner }}/{{ ghRepo }}</strong> ({{ ghBranch }})
+      </div>
+      <div v-else class="gh-status warn">
+        未配置 GitHub 连接，操作将模拟执行
+      </div>
+
+      <div v-if="loading" class="loading">操作中，请稍候...</div>
+
+      <table v-if="!loading && filtered.length">
         <thead>
           <tr>
             <th>#</th>
@@ -127,15 +249,51 @@ function remove(w) {
             <td>{{ w.publishDate || '—' }}</td>
             <td><code>{{ w.id }}</code></td>
             <td class="actions">
-              <button class="btn sm outline" @click="openEdit(w)">编辑</button>
-              <button class="btn sm danger" @click="remove(w)">删除</button>
+              <button class="btn sm outline" @click="openEdit(w)" :disabled="loading">编辑</button>
+              <button class="btn sm danger" @click="remove(w)" :disabled="loading">删除</button>
             </td>
           </tr>
         </tbody>
       </table>
-      <div v-else class="empty">暂无作品</div>
+      <div v-else-if="!loading" class="empty">暂无作品</div>
     </div>
 
+    <!-- 设置弹窗 -->
+    <Teleport to="body">
+      <div v-if="showSettings" class="overlay" @click.self="showSettings = false">
+        <div class="modal">
+          <div class="modal-head">
+            <h2>GitHub 设置</h2>
+            <button class="close" @click="showSettings = false">✕</button>
+          </div>
+          <div class="modal-body">
+            <p class="hint">填写 GitHub 信息使数据修改同步到仓库。</p>
+            <label>Personal Access Token
+              <input v-model="ghToken" type="password" placeholder="ghp_..." />
+            </label>
+            <div class="row">
+              <label>仓库所有者
+                <input v-model="ghOwner" placeholder="yi-xiao1" />
+              </label>
+              <label>仓库名
+                <input v-model="ghRepo" placeholder="My-Own-ACG-Web" />
+              </label>
+            </div>
+            <label>分支
+              <input v-model="ghBranch" placeholder="main" />
+            </label>
+            <p class="hint">Token 需要 <code>repo</code> 权限。信息保存在浏览器本地。</p>
+            <p class="hint">也可直接在 <a href="https://app.pagescms.org" target="_blank">app.pagescms.org</a> 使用 Pages CMS。</p>
+          </div>
+          <div class="modal-foot">
+            <button class="btn" @click="showSettings = false">取消</button>
+            <button class="btn primary" @click="saveSettings">保存设置</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- 编辑弹窗 -->
     <Teleport to="body">
       <div v-if="showForm" class="overlay" @click.self="closeForm">
         <div class="modal">
@@ -165,7 +323,9 @@ function remove(w) {
           </div>
           <div class="modal-foot">
             <button class="btn" @click="closeForm">取消</button>
-            <button class="btn primary" @click="save">保存</button>
+            <button class="btn primary" @click="save" :disabled="loading">
+              {{ loading ? '保存中...' : '保存' }}
+            </button>
           </div>
         </div>
       </div>
@@ -216,12 +376,24 @@ function remove(w) {
 }
 .tab.active .count { background: rgba(244,114,182,0.1); color: #f472b6; }
 
-.toolbar { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.75rem; }
+.toolbar { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem; }
 .toolbar input {
   flex: 1; max-width: 260px; padding: 0.45rem 0.75rem;
   border: 1px solid #ddd; border-radius: 8px; font-size: 0.85rem; outline: none;
 }
 .toolbar input:focus { border-color: #f472b6; }
+
+.gh-status {
+  font-size: 0.78rem; color: #888; margin-bottom: 0.75rem; padding: 0.35rem 0.65rem;
+  background: #f0f8f0; border-radius: 6px; display: inline-block;
+}
+.gh-status.warn { background: #fff8e6; }
+.hint { font-size: 0.78rem; color: #999; margin: 0; }
+.hint code { font-size: 0.75rem; }
+.hint a { color: #60a5fa; }
+.loading {
+  padding: 2rem; text-align: center; color: #888; font-size: 0.85rem;
+}
 
 table { width: 100%; border-collapse: collapse; font-size: 0.85rem; background: #fff; border-radius: 10px; overflow: hidden; border: 1px solid #eee; }
 th { text-align: left; padding: 0.55rem 0.75rem; background: #fafafa; color: #888; font-weight: 600; font-size: 0.75rem; border-bottom: 1px solid #eee; }
@@ -237,13 +409,14 @@ code { font-size: 0.75rem; background: #f0f0f0; padding: 0.1rem 0.35rem; border-
   padding: 0.4rem 0.8rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600;
   cursor: pointer; border: none; transition: 0.15s;
 }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn.sm { padding: 0.25rem 0.55rem; font-size: 0.75rem; }
 .btn.primary { background: #f472b6; color: #fff; }
-.btn.primary:hover { background: #e05da0; }
+.btn.primary:hover:not(:disabled) { background: #e05da0; }
 .btn.outline { background: rgba(96,165,250,0.1); color: #60a5fa; }
-.btn.outline:hover { background: rgba(96,165,250,0.2); }
+.btn.outline:hover:not(:disabled) { background: rgba(96,165,250,0.2); }
 .btn.danger { background: rgba(244,67,54,0.08); color: #e53935; }
-.btn.danger:hover { background: rgba(244,67,54,0.18); }
+.btn.danger:hover:not(:disabled) { background: rgba(244,67,54,0.18); }
 
 .overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,0.35);
