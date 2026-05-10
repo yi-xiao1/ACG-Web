@@ -8,6 +8,7 @@ media:
 content:
   - name: anime
     label: 番剧
+    type: collection
     path: src/data/anime
     filename: "{{fields.id}}.md"
     fields:
@@ -20,10 +21,12 @@ content:
       - { name: type, type: string, hidden: true, default: anime }
     body: { label: 正文, type: markdown }
     view:
+      fields: [title, publishDate, tags]
       sort: [publishDate desc, title asc]
 
   - name: manga
     label: 漫画
+    type: collection
     path: src/data/manga
     filename: "{{fields.id}}.md"
     fields:
@@ -36,10 +39,12 @@ content:
       - { name: type, type: string, hidden: true, default: manga }
     body: { label: 正文, type: markdown }
     view:
+      fields: [title, publishDate, tags]
       sort: [publishDate desc, title asc]
 
   - name: novel
     label: 小说
+    type: collection
     path: src/data/novel
     filename: "{{fields.id}}.md"
     fields:
@@ -52,10 +57,12 @@ content:
       - { name: type, type: string, hidden: true, default: novel }
     body: { label: 正文, type: markdown }
     view:
+      fields: [title, publishDate, tags]
       sort: [publishDate desc, title asc]
 
   - name: game
     label: 游戏
+    type: collection
     path: src/data/game
     filename: "{{fields.id}}.md"
     fields:
@@ -68,4 +75,5 @@ content:
       - { name: type, type: string, hidden: true, default: game }
     body: { label: 正文, type: markdown }
     view:
+      fields: [title, publishDate, tags]
       sort: [publishDate desc, title asc]
