@@ -5,74 +5,67 @@ media:
     output: /covers
     categories: [image]
 
-f-def: &f-def
-  title: &t-def { name: title, type: string, label: 标题, required: true }
-  id: &i-def { name: id, type: string, label: 标识符, required: true, description: 全小写字母和连字符 }
-  cover: &c-def { name: cover, type: image, label: 封面, media: [covers] }
-  tags: &g-def { name: tags, type: string, label: 标签, list: true }
-  date: &d-def { name: publishDate, type: date, label: 发布日期 }
-  url: &u-def { name: url, type: string, label: 外部链接 }
-
-body-d: &b-d { label: 正文, type: markdown }
-view-d: &v-d { sort: [publishDate desc, title asc] }
-
 content:
   - name: anime
     label: 番剧
     path: src/data/anime
-    filename: '{{fields.id}}.md'
+    filename: "{{fields.id}}.md"
     fields:
-      - *t-def
-      - *i-def
-      - *c-def
-      - *g-def
-      - *d-def
-      - *u-def
+      - { name: title, type: string, label: 标题, required: true }
+      - { name: id, type: string, label: 标识符, required: true, description: "全小写字母和连字符" }
+      - { name: cover, type: image, label: 封面, media: [covers] }
+      - { name: tags, type: string, label: 标签, list: true }
+      - { name: publishDate, type: date, label: 发布日期 }
+      - { name: url, type: string, label: 外部链接 }
       - { name: type, type: string, hidden: true, default: anime }
-    body: *b-d
-    view: *v-d
+    body: { label: 正文, type: markdown }
+    view:
+      sort: [publishDate desc, title asc]
 
   - name: manga
     label: 漫画
     path: src/data/manga
-    filename: '{{fields.id}}.md'
+    filename: "{{fields.id}}.md"
     fields:
-      - *t-def
-      - *i-def
-      - *c-def
-      - *g-def
-      - *d-def
-      - *u-def
+      - { name: title, type: string, label: 标题, required: true }
+      - { name: id, type: string, label: 标识符, required: true, description: "全小写字母和连字符" }
+      - { name: cover, type: image, label: 封面, media: [covers] }
+      - { name: tags, type: string, label: 标签, list: true }
+      - { name: publishDate, type: date, label: 发布日期 }
+      - { name: url, type: string, label: 外部链接 }
       - { name: type, type: string, hidden: true, default: manga }
-    body: *b-d
-    view: *v-d
+    body: { label: 正文, type: markdown }
+    view:
+      sort: [publishDate desc, title asc]
 
   - name: novel
     label: 小说
     path: src/data/novel
-    filename: '{{fields.id}}.md'
+    filename: "{{fields.id}}.md"
     fields:
-      - *t-def
-      - *i-def
-      - *c-def
-      - *g-def
-      - *d-def
-      - *u-def
+      - { name: title, type: string, label: 标题, required: true }
+      - { name: id, type: string, label: 标识符, required: true, description: "全小写字母和连字符" }
+      - { name: cover, type: image, label: 封面, media: [covers] }
+      - { name: tags, type: string, label: 标签, list: true }
+      - { name: publishDate, type: date, label: 发布日期 }
+      - { name: url, type: string, label: 外部链接 }
       - { name: type, type: string, hidden: true, default: novel }
-    body: *b-d
-    view: *v-d
+    body: { label: 正文, type: markdown }
+    view:
+      sort: [publishDate desc, title asc]
 
   - name: game
     label: 游戏
     path: src/data/game
-    filename: '{{fields.id}}.md'
+    filename: "{{fields.id}}.md"
     fields:
-      - *t-def
-      - *i-def
-      - *c-def
-      - *g-def
-      - *d-def
-      - *u-def
+      - { name: title, type: string, label: 标题, required: true }
+      - { name: id, type: string, label: 标识符, required: true, description: "全小写字母和连字符" }
+      - { name: cover, type: image, label: 封面, media: [covers] }
+      - { name: tags, type: string, label: 标签, list: true }
+      - { name: publishDate, type: date, label: 发布日期 }
+      - { name: url, type: string, label: 外部链接 }
       - { name: type, type: string, hidden: true, default: game }
-    body: *b-d
-    view: *v-d
+    body: { label: 正文, type: markdown }
+    view:
+      sort: [publishDate desc, title asc]
