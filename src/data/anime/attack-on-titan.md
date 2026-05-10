@@ -1,6 +1,6 @@
 ---
 title: "进击的巨人"
-cover: "/covers/anime/attack-on-titian.jpg"
+cover: "/covers/anime/attack-on-titan.jpg"
 tags: ["动作", "黑暗奇幻", "少年"]
 publishDate: "2013-04-07"
 url: "https://example.com/watch/aot"
