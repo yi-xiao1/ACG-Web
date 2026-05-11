@@ -51,9 +51,10 @@ function saveSettings() {
 // ── 封面上传 ──
 const coverFile = ref(null)
 const coverPreview = ref('')
+const showCoverViewer = ref(false)
+const coverInput = ref(null)
 const bodyTextarea = ref(null)
 
-// 选择封面图片
 function onCoverSelected(e) {
   const file = e.target.files[0]
   if (!file) return
@@ -68,9 +69,6 @@ function updateCoverPath(file) {
   const ext = file.name.split('.').pop()
   form.value.cover = `/covers/${form.value.type}/${form.value.id}.${ext}`
 }
-watch([() => form.value.id, () => form.value.type], () => {
-  if (coverFile.value) updateCoverPath(coverFile.value)
-})
 
 // ── MD 语法工具栏 ──
 function insertMarkdown(type) {
@@ -82,14 +80,14 @@ function insertMarkdown(type) {
   const ops = {
     bold: `**${sel || '粗体文字'}**`,
     italic: `*${sel || '斜体文字'}*`,
-    h2: `\n## ${sel || '标题'}\n`,
-    h3: `\n### ${sel || '标题'}\n`,
-    link: `[${sel || '链接文字'}](url)`,
-    ul: `\n- ${sel || '列表项'}\n`,
-    ol: `\n1. ${sel || '列表项'}\n`,
-    quote: `> ${sel || '引用文字'}\n`,
-    code: sel ? `\`${sel}\`` : '`代码`',
-    hr: `\n---\n`
+    h2: '\n## ' + (sel || '标题') + '\n',
+    h3: '\n### ' + (sel || '标题') + '\n',
+    link: '[' + (sel || '链接文字') + '](url)',
+    ul: '\n- ' + (sel || '列表项') + '\n',
+    ol: '\n1. ' + (sel || '列表项') + '\n',
+    quote: '> ' + (sel || '引用文字') + '\n',
+    code: sel ? ('`' + sel + '`') : '`代码`',
+    hr: '\n---\n'
   }
   const insert = ops[type] || ''
   form.value.body = form.value.body.substring(0, start) + insert + form.value.body.substring(end)
@@ -133,31 +131,34 @@ function closeForm() {
   coverPreview.value = ''
 }
 
+watch([() => form.value.id, () => form.value.type], () => {
+  if (coverFile.value) updateCoverPath(coverFile.value)
+})
+
 // ── GitHub API ──
 const GH_API = 'https://api.github.com'
 
 function buildContent(f) {
   const tags = f.tags
-    ? '[' + f.tags.split(',').map(t => `"${t.trim()}"`).join(', ') + ']'
+    ? '[' + f.tags.split(',').map(t => '"' + t.trim() + '"').join(', ') + ']'
     : '[]'
-  return `---
-title: "${f.title}"
-cover: "${f.cover}"
-tags: ${tags}
-publishDate: "${f.publishDate}"
-url: "${f.url}"
-type: "${f.type}"
-id: "${f.id}"
----
-
-${f.body}`
+  return '---\n' +
+    'title: "' + f.title + '"\n' +
+    'cover: "' + f.cover + '"\n' +
+    'tags: ' + tags + '\n' +
+    'publishDate: "' + f.publishDate + '"\n' +
+    'url: "' + f.url + '"\n' +
+    'type: "' + f.type + '"\n' +
+    'id: "' + f.id + '"\n' +
+    '---\n\n' +
+    f.body
 }
 
 async function ghRequest(method, path, body) {
-  const res = await fetch(`${GH_API}${path}`, {
+  const res = await fetch(GH_API + path, {
     method,
     headers: {
-      Authorization: `Bearer ${ghToken.value}`,
+      Authorization: 'Bearer ' + ghToken.value,
       Accept: 'application/vnd.github+json',
       'Content-Type': 'application/json'
     },
@@ -165,14 +166,14 @@ async function ghRequest(method, path, body) {
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
-    throw new Error(err.message || `HTTP ${res.status}`)
+    throw new Error(err.message || 'HTTP ' + res.status)
   }
   return res.json()
 }
 
 async function getFileSha(filePath) {
   try {
-    const data = await ghRequest('GET', `/repos/${ghOwner.value}/${ghRepo.value}/contents/${filePath}?ref=${ghBranch.value}`)
+    const data = await ghRequest('GET', '/repos/' + ghOwner.value + '/' + ghRepo.value + '/contents/' + filePath + '?ref=' + ghBranch.value)
     return data.sha
   } catch {
     return null
@@ -182,7 +183,7 @@ async function getFileSha(filePath) {
 async function uploadCover() {
   if (!coverFile.value) return form.value.cover
   const ext = coverFile.value.name.split('.').pop()
-  const filePath = `public/covers/${form.value.type}/${form.value.id}.${ext}`
+  const filePath = 'public/covers/' + form.value.type + '/' + form.value.id + '.' + ext
   const reader = new FileReader()
   const base64 = await new Promise((resolve, reject) => {
     reader.onload = () => resolve(reader.result.split(',')[1])
@@ -190,13 +191,13 @@ async function uploadCover() {
     reader.readAsDataURL(coverFile.value)
   })
   const sha = await getFileSha(filePath)
-  await ghRequest('PUT', `/repos/${ghOwner.value}/${ghRepo.value}/contents/${filePath}`, {
-    message: `上传封面：${form.value.title}`,
+  await ghRequest('PUT', '/repos/' + ghOwner.value + '/' + ghRepo.value + '/contents/' + filePath, {
+    message: '上传封面：' + form.value.title,
     content: base64,
     sha: sha || undefined,
     branch: ghBranch.value
   })
-  return `/covers/${form.value.type}/${form.value.id}.${ext}`
+  return '/covers/' + form.value.type + '/' + form.value.id + '.' + ext
 }
 
 async function save() {
@@ -210,7 +211,7 @@ async function save() {
     return
   }
 
-  const filePath = `src/data/${form.value.type}/${form.value.id}.md`
+  const filePath = 'src/data/' + form.value.type + '/' + form.value.id + '.md'
   const content = btoa(unescape(encodeURIComponent(buildContent(form.value))))
   const action = editing.value ? '编辑' : '新增'
   loading.value = true
@@ -218,43 +219,43 @@ async function save() {
   try {
     form.value.cover = await uploadCover()
     const sha = editing.value ? await getFileSha(filePath) : undefined
-    await ghRequest('PUT', `/repos/${ghOwner.value}/${ghRepo.value}/contents/${filePath}`, {
-      message: `${action}作品：${form.value.title}`,
+    await ghRequest('PUT', '/repos/' + ghOwner.value + '/' + ghRepo.value + '/contents/' + filePath, {
+      message: action + '作品：' + form.value.title,
       content,
       sha,
       branch: ghBranch.value
     })
-    alert(`${action}成功！请刷新页面查看变更（Cloudflare Pages 部署可能需要几分钟）`)
+    alert(action + '成功！请刷新页面查看变更（Cloudflare Pages 部署可能需要几分钟）')
     closeForm()
   } catch (e) {
-    alert(`操作失败：${e.message}`)
+    alert('操作失败：' + e.message)
   } finally {
     loading.value = false
   }
 }
 
 async function remove(w) {
-  if (!confirm(`确定删除「${w.title}」？此操作不可撤销。`)) return
+  if (!confirm('确定删除"' + w.title + '"？此操作不可撤销。')) return
   if (!ghToken.value || !ghOwner.value || !ghRepo.value) {
     alert('请先在设置中配置 GitHub 信息')
     showSettings.value = true
     return
   }
 
-  const filePath = `src/data/${w.type}/${w.id}.md`
+  const filePath = 'src/data/' + w.type + '/' + w.id + '.md'
   loading.value = true
 
   try {
     const sha = await getFileSha(filePath)
     if (!sha) throw new Error('文件不存在')
-    await ghRequest('DELETE', `/repos/${ghOwner.value}/${ghRepo.value}/contents/${filePath}`, {
-      message: `删除作品：${w.title}`,
+    await ghRequest('DELETE', '/repos/' + ghOwner.value + '/' + ghRepo.value + '/contents/' + filePath, {
+      message: '删除作品：' + w.title,
       sha,
       branch: ghBranch.value
     })
-    alert(`删除成功！请刷新页面查看变更（Cloudflare Pages 部署可能需要几分钟）`)
+    alert('删除成功！请刷新页面查看变更（Cloudflare Pages 部署可能需要几分钟）')
   } catch (e) {
-    alert(`操作失败：${e.message}`)
+    alert('操作失败：' + e.message)
   } finally {
     loading.value = false
   }
@@ -263,7 +264,6 @@ async function remove(w) {
 
 <template>
   <div class="admin">
-    <!-- 密码门 -->
     <div v-if="!authed" class="gate">
       <form class="gate-card" @submit.prevent="tryAuth">
         <h2>管理员验证</h2>
@@ -272,7 +272,6 @@ async function remove(w) {
       </form>
     </div>
 
-    <!-- 管理面板 -->
     <div v-else class="panel">
       <header>
         <h1>数据管理</h1>
@@ -291,7 +290,7 @@ async function remove(w) {
       <div class="toolbar">
         <input v-model="search" placeholder="搜索标题或标签..." />
         <button class="btn primary" @click="openAdd" :disabled="loading">+ 新增</button>
-        <button class="btn" @click="showSettings = true">⚙ 设置</button>
+        <button class="btn" @click="showSettings = true">&#x2699; 设置</button>
       </div>
 
       <div v-if="ghToken && ghOwner && ghRepo" class="gh-status">
@@ -321,7 +320,7 @@ async function remove(w) {
             <td>
               <span v-for="t in (w.tags || []).slice(0, 3)" :key="t" class="tag">{{ t }}</span>
             </td>
-            <td>{{ w.publishDate || '—' }}</td>
+            <td>{{ w.publishDate || '&mdash;' }}</td>
             <td><code>{{ w.id }}</code></td>
             <td class="actions">
               <button class="btn sm outline" @click="openEdit(w)" :disabled="loading">编辑</button>
@@ -333,13 +332,12 @@ async function remove(w) {
       <div v-else-if="!loading" class="empty">暂无作品</div>
     </div>
 
-    <!-- 设置弹窗 -->
     <Teleport to="body">
       <div v-if="showSettings" class="overlay" @click.self="showSettings = false">
         <div class="modal">
           <div class="modal-head">
             <h2>GitHub 设置</h2>
-            <button class="close" @click="showSettings = false">✕</button>
+            <button class="close" @click="showSettings = false">&#x2715;</button>
           </div>
           <div class="modal-body">
             <p class="hint">填写 GitHub 信息使数据修改同步到仓库。</p>
@@ -368,13 +366,12 @@ async function remove(w) {
       </div>
     </Teleport>
 
-    <!-- 编辑弹窗 -->
     <Teleport to="body">
       <div v-if="showForm" class="overlay" @click.self="closeForm">
         <div class="modal">
           <div class="modal-head">
             <h2>{{ editing ? '编辑' : '新增' }}作品</h2>
-            <button class="close" @click="closeForm">✕</button>
+            <button class="close" @click="closeForm">&#x2715;</button>
           </div>
           <div class="modal-body">
             <label>标题 <input v-model="form.title" /></label>
@@ -386,18 +383,18 @@ async function remove(w) {
               </label>
               <label>ID <input v-model="form.id" placeholder="小写+连字符" /></label>
             </div>
-            <label>封面图片
-              <div class="cover-upload">
-                <input type="file" accept="image/*" @change="onCoverSelected" />
-                <div v-if="coverPreview" class="cover-preview">
-                  <img :src="coverPreview" />
-                </div>
-                <div v-else-if="form.cover" class="cover-preview">
-                  <img :src="form.cover" @error="$event.target.style.display='none'" />
-                </div>
-                <span v-if="form.cover" class="cover-path">{{ form.cover }}</span>
+            <div class="cover-upload">
+              <div class="cover-select">
+                <span class="cover-label">封面图片</span>
+                <button type="button" class="btn outline" @click="coverInput.click()">选择图片</button>
+                <input ref="coverInput" type="file" accept="image/*" @change="onCoverSelected" hidden />
+                <span v-if="coverFile" class="cover-filename">{{ coverFile.name }}</span>
+                <span v-else-if="form.cover && !coverFile" class="cover-path">{{ form.cover }}</span>
               </div>
-            </label>
+              <div v-if="coverPreview || form.cover" class="cover-preview" @click="showCoverViewer = true">
+                <img :src="coverPreview || form.cover" @error="$event.target.style.display='none'" />
+              </div>
+            </div>
             <div class="row">
               <label>日期 <input v-model="form.publishDate" placeholder="2025-01-01" /></label>
               <label>链接 <input v-model="form.url" placeholder="https://" /></label>
@@ -411,14 +408,16 @@ async function remove(w) {
                 <button type="button" class="md-btn" @click="insertMarkdown('h2')" title="二级标题">H2</button>
                 <button type="button" class="md-btn" @click="insertMarkdown('h3')" title="三级标题">H3</button>
                 <span class="md-sep"></span>
-                <button type="button" class="md-btn" @click="insertMarkdown('ul')" title="无序列表"><svg viewBox="0 0 16 16" fill="currentColor" width="14"><circle cx="4" cy="8" r="1.5"/><rect x="7" y="7.25" width="8" height="1.5" rx=".75"/></svg></button>
+                <button type="button" class="md-btn" @click="insertMarkdown('ul')" title="无序列表">
+                  <svg viewBox="0 0 16 16" fill="currentColor" width="14"><circle cx="4" cy="8" r="1.5"></circle><rect x="7" y="7.25" width="8" height="1.5" rx=".75"></rect></svg>
+                </button>
                 <button type="button" class="md-btn" @click="insertMarkdown('ol')" title="有序列表">1.</button>
                 <span class="md-sep"></span>
-                <button type="button" class="md-btn" @click="insertMarkdown('quote')" title="引用">❝</button>
+                <button type="button" class="md-btn" @click="insertMarkdown('quote')" title="引用">&ldquo;</button>
                 <button type="button" class="md-btn" @click="insertMarkdown('code')" title="行内代码">&lt;/&gt;</button>
-                <button type="button" class="md-btn" @click="insertMarkdown('link')" title="链接">🔗</button>
+                <button type="button" class="md-btn" @click="insertMarkdown('link')" title="链接">&#x1F517;</button>
                 <span class="md-sep"></span>
-                <button type="button" class="md-btn" @click="insertMarkdown('hr')" title="分割线">—</button>
+                <button type="button" class="md-btn" @click="insertMarkdown('hr')" title="分割线">&mdash;</button>
               </div>
               <textarea ref="bodyTextarea" v-model="form.body" rows="6"></textarea>
             </label>
@@ -432,6 +431,11 @@ async function remove(w) {
         </div>
       </div>
     </Teleport>
+
+    <div v-if="showCoverViewer" class="viewer-overlay" @click.self="showCoverViewer = false">
+      <button class="viewer-close" @click="showCoverViewer = false">&#x2715;</button>
+      <img :src="coverPreview || form.cover" class="viewer-img" />
+    </div>
   </div>
 </template>
 
@@ -563,14 +567,41 @@ code { font-size: 0.75rem; background: #f0f0f0; padding: 0.1rem 0.35rem; border-
 .modal-body label:has(.md-toolbar) textarea {
   border-top-left-radius: 0; border-top-right-radius: 0; border-top: none;
 }
-.cover-upload { display: flex; flex-direction: column; gap: 0.4rem; }
-.cover-upload input[type="file"] { font-size: 0.78rem; padding: 0.3rem 0; }
-.cover-preview {
-  width: 100%; max-height: 120px; overflow: hidden; border-radius: 6px;
-  border: 1px solid #eee;
+.cover-upload {
+  display: flex; flex-direction: row; gap: 0.75rem; align-items: flex-start;
 }
-.cover-preview img { width: 100%; height: 100%; object-fit: cover; }
-.cover-path { font-size: 0.72rem; color: #999; font-family: var(--font-mono, monospace); }
+.cover-select {
+  flex: 1; display: flex; flex-direction: column; gap: 0.3rem; padding-top: 0.1rem;
+}
+.cover-select .btn { align-self: flex-start; }
+.cover-filename, .cover-path {
+  font-size: 0.72rem; color: #999; font-family: var(--font-mono, monospace);
+  word-break: break-all; line-height: 1.3;
+}
+.cover-preview {
+  width: 100px; height: 100px; flex-shrink: 0; border-radius: 8px;
+  border: 1px solid #eee; overflow: hidden; cursor: zoom-in;
+  display: flex; align-items: center; justify-content: center;
+  background: #fafafa;
+}
+.cover-preview img {
+  max-width: 100%; max-height: 100%; object-fit: contain;
+}
+.viewer-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.75);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 3000; cursor: zoom-out;
+}
+.viewer-overlay .viewer-close {
+  position: fixed; top: 1rem; right: 1.5rem; background: none; border: none;
+  font-size: 1.8rem; color: #fff; cursor: pointer; z-index: 3001;
+  opacity: 0.7; line-height: 1;
+}
+.viewer-overlay .viewer-close:hover { opacity: 1; }
+.viewer-overlay .viewer-img {
+  max-width: 90vw; max-height: 90vh; border-radius: 8px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.4);
+}
 .row { display: flex; gap: 0.75rem; }
 .row label { flex: 1; }
 .modal-foot {
