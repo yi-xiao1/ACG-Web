@@ -1,7 +1,9 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
-const MOCK_MESSAGES = [
+const FILE_PATH = 'src/data/messages.json'
+
+const MOCK = [
   {
     id: 1,
     username: '二次元旅人',
@@ -18,49 +20,83 @@ const MOCK_MESSAGES = [
   }
 ]
 
-let useMock = false
+function getConfig() {
+  return {
+    token: localStorage.getItem('gh_token') || '',
+    owner: localStorage.getItem('gh_owner') || 'yi-xiao1',
+    repo: localStorage.getItem('gh_repo') || 'My-Own-ACG-Web',
+    branch: localStorage.getItem('gh_branch') || 'main'
+  }
+}
+
+async function ghRequest(method, path, token, body) {
+  const res = await fetch(`https://api.github.com${path}`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/vnd.github+json',
+      'Content-Type': 'application/json'
+    },
+    body: body ? JSON.stringify(body) : undefined
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.message || `HTTP ${res.status}`)
+  }
+  return res.json()
+}
 
 export const useMessagesStore = defineStore('messages', () => {
   const messages = ref([])
 
   async function fetchMessages() {
+    const { token, owner, repo, branch } = getConfig()
+    if (!token) {
+      messages.value = MOCK
+      return
+    }
     try {
-      const res = await fetch('/api/messages')
-      if (!res.ok) throw new Error('API 不可用')
-      const text = await res.text()
-      if (text.startsWith('<!DOCTYPE')) throw new Error('收到 HTML 响应')
-      messages.value = JSON.parse(text)
+      const data = await ghRequest('GET',
+        `/repos/${owner}/${repo}/contents/${FILE_PATH}?ref=${branch}`, token)
+      messages.value = JSON.parse(atob(data.content.replace(/\n/g, '')))
     } catch {
-      useMock = true
-      messages.value = MOCK_MESSAGES
+      messages.value = MOCK
     }
   }
 
   async function postMessage(msg) {
-    if (useMock) {
-      const newMsg = {
-        id: Date.now(),
-        username: msg.username || '匿名',
-        email: msg.email || '',
-        content: msg.content || '',
-        createdAt: new Date().toISOString()
-      }
-      messages.value.unshift(newMsg)
-      return newMsg
+    const { token, owner, repo, branch } = getConfig()
+    if (!token) throw new Error('请先在管理后台配置 GitHub 连接')
+
+    // 先读当前文件
+    let sha, existing
+    try {
+      const data = await ghRequest('GET',
+        `/repos/${owner}/${repo}/contents/${FILE_PATH}?ref=${branch}`, token)
+      sha = data.sha
+      existing = JSON.parse(atob(data.content.replace(/\n/g, '')))
+    } catch {
+      sha = null
+      existing = []
     }
 
-    const res = await fetch('/api/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        username: msg.username,
-        email: msg.email || '',
-        content: msg.content
-      })
+    const newMsg = {
+      id: Date.now(),
+      username: msg.username || '匿名',
+      email: msg.email || '',
+      content: msg.content || '',
+      createdAt: new Date().toISOString()
+    }
+    existing.unshift(newMsg)
+
+    await ghRequest('PUT', `/repos/${owner}/${repo}/contents/${FILE_PATH}`, token, {
+      message: '更新留言板',
+      content: btoa(unescape(encodeURIComponent(JSON.stringify(existing, null, 2)))),
+      sha: sha || undefined,
+      branch
     })
-    if (!res.ok) throw new Error('发布留言失败')
-    const newMsg = await res.json()
-    messages.value.unshift(newMsg)
+
+    messages.value = existing
     return newMsg
   }
 
