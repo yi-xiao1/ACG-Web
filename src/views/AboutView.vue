@@ -92,14 +92,14 @@ const messagesStore = useMessagesStore()
         </h2>
         <p class="about-text">本站采用纯前端 + Serverless 技术构建，数据存储在 Markdown 文件和 Cloudflare KV 中，无需传统后端。</p>
         <div class="tech-items">
-          <span class="tech-item">Vue 3</span>
-          <span class="tech-item">Vue Router</span>
-          <span class="tech-item">Pinia</span>
-          <span class="tech-item">Vite</span>
-          <span class="tech-item">marked</span>
-          <span class="tech-item">Cloudflare Pages</span>
-          <span class="tech-item">Cloudflare KV</span>
-          <span class="tech-item">Pages CMS</span>
+          <a href="https://vuejs.org" target="_blank" rel="noopener" class="tech-item">Vue 3</a>
+          <a href="https://router.vuejs.org" target="_blank" rel="noopener" class="tech-item">Vue Router</a>
+          <a href="https://pinia.vuejs.org" target="_blank" rel="noopener" class="tech-item">Pinia</a>
+          <a href="https://vitejs.dev" target="_blank" rel="noopener" class="tech-item">Vite</a>
+          <a href="https://marked.js.org" target="_blank" rel="noopener" class="tech-item">marked</a>
+          <a href="https://developers.cloudflare.com/pages" target="_blank" rel="noopener" class="tech-item">Cloudflare Pages</a>
+          <a href="https://developers.cloudflare.com/kv" target="_blank" rel="noopener" class="tech-item">Cloudflare KV</a>
+          <a href="https://pagescms.org" target="_blank" rel="noopener" class="tech-item">Pages CMS</a>
         </div>
       </div>
 
@@ -293,6 +293,13 @@ const messagesStore = useMessagesStore()
   border: 1px solid rgba(96, 165, 250, 0.12);
   font-family: var(--font-mono);
   letter-spacing: 0.03em;
+  text-decoration: none;
+  transition: all 0.2s;
+}
+.tech-item:hover {
+  background: rgba(96, 165, 250, 0.16);
+  border-color: var(--cyan);
+  transform: translateY(-1px);
 }
 
 /* ─── Contact ─── */
