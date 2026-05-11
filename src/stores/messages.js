@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
-const FILE_PATH = 'src/data/messages.json'
+// 部署 Worker 后把地址填在这里
+const WORKER_URL = 'https://acgweb-api.your-account.workers.dev'
 
 const MOCK = [
   {
@@ -20,83 +21,46 @@ const MOCK = [
   }
 ]
 
-function getConfig() {
-  return {
-    token: localStorage.getItem('gh_token') || '',
-    owner: localStorage.getItem('gh_owner') || 'yi-xiao1',
-    repo: localStorage.getItem('gh_repo') || 'My-Own-ACG-Web',
-    branch: localStorage.getItem('gh_branch') || 'main'
-  }
-}
-
-async function ghRequest(method, path, token, body) {
-  const res = await fetch(`https://api.github.com${path}`, {
-    method,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: 'application/vnd.github+json',
-      'Content-Type': 'application/json'
-    },
-    body: body ? JSON.stringify(body) : undefined
-  })
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}))
-    throw new Error(err.message || `HTTP ${res.status}`)
-  }
-  return res.json()
-}
+let useMock = false
 
 export const useMessagesStore = defineStore('messages', () => {
   const messages = ref([])
 
   async function fetchMessages() {
-    const { token, owner, repo, branch } = getConfig()
-    if (!token) {
-      messages.value = MOCK
-      return
-    }
     try {
-      const data = await ghRequest('GET',
-        `/repos/${owner}/${repo}/contents/${FILE_PATH}?ref=${branch}`, token)
-      messages.value = JSON.parse(atob(data.content.replace(/\n/g, '')))
+      const res = await fetch(WORKER_URL)
+      if (!res.ok) throw new Error('API 不可用')
+      const text = await res.text()
+      if (text.startsWith('<!DOCTYPE')) throw new Error('收到 HTML')
+      messages.value = JSON.parse(text)
+      useMock = false
     } catch {
+      useMock = true
       messages.value = MOCK
     }
   }
 
   async function postMessage(msg) {
-    const { token, owner, repo, branch } = getConfig()
-    if (!token) throw new Error('请先在管理后台配置 GitHub 连接')
-
-    // 先读当前文件
-    let sha, existing
-    try {
-      const data = await ghRequest('GET',
-        `/repos/${owner}/${repo}/contents/${FILE_PATH}?ref=${branch}`, token)
-      sha = data.sha
-      existing = JSON.parse(atob(data.content.replace(/\n/g, '')))
-    } catch {
-      sha = null
-      existing = []
+    if (useMock) {
+      const newMsg = {
+        id: Date.now(),
+        username: msg.username || '匿名',
+        email: msg.email || '',
+        content: msg.content || '',
+        createdAt: new Date().toISOString()
+      }
+      messages.value.unshift(newMsg)
+      return newMsg
     }
 
-    const newMsg = {
-      id: Date.now(),
-      username: msg.username || '匿名',
-      email: msg.email || '',
-      content: msg.content || '',
-      createdAt: new Date().toISOString()
-    }
-    existing.unshift(newMsg)
-
-    await ghRequest('PUT', `/repos/${owner}/${repo}/contents/${FILE_PATH}`, token, {
-      message: '更新留言板',
-      content: btoa(unescape(encodeURIComponent(JSON.stringify(existing, null, 2)))),
-      sha: sha || undefined,
-      branch
+    const res = await fetch(WORKER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(msg)
     })
-
-    messages.value = existing
+    if (!res.ok) throw new Error('发布留言失败')
+    const newMsg = await res.json()
+    messages.value.unshift(newMsg)
     return newMsg
   }
 
