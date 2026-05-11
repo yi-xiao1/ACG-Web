@@ -90,13 +90,16 @@ const messagesStore = useMessagesStore()
           <span class="heading-dot"></span>
           技术架构
         </h2>
-        <p class="about-text">本站采用纯前端技术构建，具有响应式设计，可在各种设备上提供良好的浏览体验。</p>
+        <p class="about-text">本站采用纯前端 + Serverless 技术构建，数据存储在 Markdown 文件和 Cloudflare KV 中，无需传统后端。</p>
         <div class="tech-items">
           <span class="tech-item">Vue 3</span>
           <span class="tech-item">Vue Router</span>
           <span class="tech-item">Pinia</span>
           <span class="tech-item">Vite</span>
           <span class="tech-item">marked</span>
+          <span class="tech-item">Cloudflare Pages</span>
+          <span class="tech-item">Cloudflare KV</span>
+          <span class="tech-item">Pages CMS</span>
         </div>
       </div>
 
