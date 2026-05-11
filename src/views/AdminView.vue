@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useWorksStore } from '@/stores/works'
 
@@ -48,6 +48,54 @@ function saveSettings() {
   showSettings.value = false
 }
 
+// ── 封面上传 ──
+const coverFile = ref(null)
+const coverPreview = ref('')
+const bodyTextarea = ref(null)
+
+// 选择封面图片
+function onCoverSelected(e) {
+  const file = e.target.files[0]
+  if (!file) return
+  coverFile.value = file
+  const reader = new FileReader()
+  reader.onload = () => { coverPreview.value = reader.result }
+  reader.readAsDataURL(file)
+  updateCoverPath(file)
+}
+function updateCoverPath(file) {
+  if (!file || !form.value.id || !form.value.type) return
+  const ext = file.name.split('.').pop()
+  form.value.cover = `/covers/${form.value.type}/${form.value.id}.${ext}`
+}
+watch([() => form.value.id, () => form.value.type], () => {
+  if (coverFile.value) updateCoverPath(coverFile.value)
+})
+
+// ── MD 语法工具栏 ──
+function insertMarkdown(type) {
+  const ta = bodyTextarea.value
+  if (!ta) return
+  const start = ta.selectionStart
+  const end = ta.selectionEnd
+  const sel = form.value.body.substring(start, end)
+  const ops = {
+    bold: `**${sel || '粗体文字'}**`,
+    italic: `*${sel || '斜体文字'}*`,
+    h2: `\n## ${sel || '标题'}\n`,
+    h3: `\n### ${sel || '标题'}\n`,
+    link: `[${sel || '链接文字'}](url)`,
+    ul: `\n- ${sel || '列表项'}\n`,
+    ol: `\n1. ${sel || '列表项'}\n`,
+    quote: `> ${sel || '引用文字'}\n`,
+    code: sel ? `\`${sel}\`` : '`代码`',
+    hr: `\n---\n`
+  }
+  const insert = ops[type] || ''
+  form.value.body = form.value.body.substring(0, start) + insert + form.value.body.substring(end)
+  ta.focus()
+}
+
 // ── 表单 ──
 const showForm = ref(false)
 const editing = ref(null)
@@ -58,10 +106,14 @@ function emptyForm() {
 function openAdd() {
   editing.value = null
   form.value = emptyForm()
+  coverFile.value = null
+  coverPreview.value = ''
   showForm.value = true
 }
 function openEdit(w) {
   editing.value = w
+  coverFile.value = null
+  coverPreview.value = ''
   form.value = {
     title: w.title || '',
     cover: w.cover || '',
@@ -77,6 +129,8 @@ function openEdit(w) {
 function closeForm() {
   showForm.value = false
   editing.value = null
+  coverFile.value = null
+  coverPreview.value = ''
 }
 
 // ── GitHub API ──
@@ -125,6 +179,26 @@ async function getFileSha(filePath) {
   }
 }
 
+async function uploadCover() {
+  if (!coverFile.value) return form.value.cover
+  const ext = coverFile.value.name.split('.').pop()
+  const filePath = `public/covers/${form.value.type}/${form.value.id}.${ext}`
+  const reader = new FileReader()
+  const base64 = await new Promise((resolve, reject) => {
+    reader.onload = () => resolve(reader.result.split(',')[1])
+    reader.onerror = reject
+    reader.readAsDataURL(coverFile.value)
+  })
+  const sha = await getFileSha(filePath)
+  await ghRequest('PUT', `/repos/${ghOwner.value}/${ghRepo.value}/contents/${filePath}`, {
+    message: `上传封面：${form.value.title}`,
+    content: base64,
+    sha: sha || undefined,
+    branch: ghBranch.value
+  })
+  return `/covers/${form.value.type}/${form.value.id}.${ext}`
+}
+
 async function save() {
   if (!ghToken.value || !ghOwner.value || !ghRepo.value) {
     alert('请先在设置中配置 GitHub 信息')
@@ -142,6 +216,7 @@ async function save() {
   loading.value = true
 
   try {
+    form.value.cover = await uploadCover()
     const sha = editing.value ? await getFileSha(filePath) : undefined
     await ghRequest('PUT', `/repos/${ghOwner.value}/${ghRepo.value}/contents/${filePath}`, {
       message: `${action}作品：${form.value.title}`,
@@ -311,14 +386,41 @@ async function remove(w) {
               </label>
               <label>ID <input v-model="form.id" placeholder="小写+连字符" /></label>
             </div>
-            <label>封面路径 <input v-model="form.cover" placeholder="/covers/anime/xxx.jpg" /></label>
+            <label>封面图片
+              <div class="cover-upload">
+                <input type="file" accept="image/*" @change="onCoverSelected" />
+                <div v-if="coverPreview" class="cover-preview">
+                  <img :src="coverPreview" />
+                </div>
+                <div v-else-if="form.cover" class="cover-preview">
+                  <img :src="form.cover" @error="$event.target.style.display='none'" />
+                </div>
+                <span v-if="form.cover" class="cover-path">{{ form.cover }}</span>
+              </div>
+            </label>
             <div class="row">
               <label>日期 <input v-model="form.publishDate" placeholder="2025-01-01" /></label>
               <label>链接 <input v-model="form.url" placeholder="https://" /></label>
             </div>
             <label>标签（逗号分隔） <input v-model="form.tags" placeholder="校园, 百合" /></label>
             <label>正文（Markdown）
-              <textarea v-model="form.body" rows="6"></textarea>
+              <div class="md-toolbar">
+                <button type="button" class="md-btn" @click="insertMarkdown('bold')" title="加粗"><b>B</b></button>
+                <button type="button" class="md-btn" @click="insertMarkdown('italic')" title="斜体"><i>I</i></button>
+                <span class="md-sep"></span>
+                <button type="button" class="md-btn" @click="insertMarkdown('h2')" title="二级标题">H2</button>
+                <button type="button" class="md-btn" @click="insertMarkdown('h3')" title="三级标题">H3</button>
+                <span class="md-sep"></span>
+                <button type="button" class="md-btn" @click="insertMarkdown('ul')" title="无序列表"><svg viewBox="0 0 16 16" fill="currentColor" width="14"><circle cx="4" cy="8" r="1.5"/><rect x="7" y="7.25" width="8" height="1.5" rx=".75"/></svg></button>
+                <button type="button" class="md-btn" @click="insertMarkdown('ol')" title="有序列表">1.</button>
+                <span class="md-sep"></span>
+                <button type="button" class="md-btn" @click="insertMarkdown('quote')" title="引用">❝</button>
+                <button type="button" class="md-btn" @click="insertMarkdown('code')" title="行内代码">&lt;/&gt;</button>
+                <button type="button" class="md-btn" @click="insertMarkdown('link')" title="链接">🔗</button>
+                <span class="md-sep"></span>
+                <button type="button" class="md-btn" @click="insertMarkdown('hr')" title="分割线">—</button>
+              </div>
+              <textarea ref="bodyTextarea" v-model="form.body" rows="6"></textarea>
             </label>
           </div>
           <div class="modal-foot">
@@ -444,6 +546,31 @@ code { font-size: 0.75rem; background: #f0f0f0; padding: 0.1rem 0.35rem; border-
 }
 .modal-body input:focus, .modal-body select:focus, .modal-body textarea:focus { border-color: #60a5fa; }
 .modal-body textarea { resize: vertical; min-height: 70px; }
+.md-toolbar {
+  display: flex; flex-wrap: wrap; gap: 2px; align-items: center;
+  padding: 0.35rem 0.5rem; background: #f8f8fc; border: 1px solid #ddd;
+  border-bottom: none; border-radius: 6px 6px 0 0;
+}
+.md-btn {
+  background: none; border: none; padding: 0.3rem 0.55rem;
+  font-size: 0.78rem; border-radius: 4px; cursor: pointer;
+  color: #555; line-height: 1; min-height: 28px;
+}
+.md-btn:hover { background: #e8e8f0; color: #2a2438; }
+.md-btn b, .md-btn i { font-size: 0.85rem; }
+.md-btn svg { vertical-align: middle; }
+.md-sep { width: 1px; height: 18px; background: #ddd; margin: 0 2px; display: inline-block; }
+.modal-body label:has(.md-toolbar) textarea {
+  border-top-left-radius: 0; border-top-right-radius: 0; border-top: none;
+}
+.cover-upload { display: flex; flex-direction: column; gap: 0.4rem; }
+.cover-upload input[type="file"] { font-size: 0.78rem; padding: 0.3rem 0; }
+.cover-preview {
+  width: 100%; max-height: 120px; overflow: hidden; border-radius: 6px;
+  border: 1px solid #eee;
+}
+.cover-preview img { width: 100%; height: 100%; object-fit: cover; }
+.cover-path { font-size: 0.72rem; color: #999; font-family: var(--font-mono, monospace); }
 .row { display: flex; gap: 0.75rem; }
 .row label { flex: 1; }
 .modal-foot {

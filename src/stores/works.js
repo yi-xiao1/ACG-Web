@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { parseFrontmatter } from '@/composables/useWorks'
 
-const modules = import.meta.glob('/src/data/**/*.md', { as: 'raw', eager: true })
+const modules = import.meta.glob('/src/data/**/*.md', { query: '?raw', import: 'default', eager: true })
 
 export const useWorksStore = defineStore('works', () => {
   const works = ref([])
