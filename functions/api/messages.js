@@ -1,17 +1,10 @@
 export async function onRequest(context) {
   const { request, env } = context
 
-  if (!env.MESSAGES) {
-    return new Response(JSON.stringify({ error: 'MESSAGES binding not configured' }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    })
-  }
-
   try {
     if (request.method === 'GET') {
-      const data = await env.MESSAGES.get('messages', 'json') || []
-      return new Response(JSON.stringify(data), {
+      const data = env.MESSAGES ? await env.MESSAGES.get('messages', 'json') : null
+      return new Response(JSON.stringify(data || []), {
         headers: { 'Content-Type': 'application/json' }
       })
     }
