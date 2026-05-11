@@ -92,14 +92,14 @@ const messagesStore = useMessagesStore()
         </h2>
         <p class="about-text">本站采用纯前端 + Serverless 技术构建，数据存储在 Markdown 文件和 Cloudflare KV 中，无需传统后端。</p>
         <div class="tech-items">
-          <a href="https://vuejs.org" target="_blank" rel="noopener" class="tech-item">Vue 3</a>
-          <a href="https://router.vuejs.org" target="_blank" rel="noopener" class="tech-item">Vue Router</a>
-          <a href="https://pinia.vuejs.org" target="_blank" rel="noopener" class="tech-item">Pinia</a>
-          <a href="https://vitejs.dev" target="_blank" rel="noopener" class="tech-item">Vite</a>
-          <a href="https://marked.js.org" target="_blank" rel="noopener" class="tech-item">marked</a>
-          <a href="https://developers.cloudflare.com/pages" target="_blank" rel="noopener" class="tech-item">Cloudflare Pages</a>
-          <a href="https://developers.cloudflare.com/kv" target="_blank" rel="noopener" class="tech-item">Cloudflare KV</a>
-          <a href="https://pagescms.org" target="_blank" rel="noopener" class="tech-item">Pages CMS</a>
+          <a href="https://vuejs.org/guide/quick-start.html" target="_blank" rel="noopener" class="tech-item">Vue 3</a>
+          <a href="https://router.vuejs.org/guide/" target="_blank" rel="noopener" class="tech-item">Vue Router</a>
+          <a href="https://pinia.vuejs.org/getting-started.html" target="_blank" rel="noopener" class="tech-item">Pinia</a>
+          <a href="https://vitejs.dev/guide/" target="_blank" rel="noopener" class="tech-item">Vite</a>
+          <a href="https://marked.js.org/getting-started/" target="_blank" rel="noopener" class="tech-item">marked</a>
+          <a href="https://developers.cloudflare.com/pages/get-started/" target="_blank" rel="noopener" class="tech-item">Cloudflare Pages</a>
+          <a href="https://developers.cloudflare.com/kv/get-started/" target="_blank" rel="noopener" class="tech-item">Cloudflare KV</a>
+          <a href="https://pagescms.org/docs/quickstart/" target="_blank" rel="noopener" class="tech-item">Pages CMS</a>
         </div>
       </div>
 
