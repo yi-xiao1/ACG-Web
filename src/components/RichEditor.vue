@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 
 const props = defineProps({
   modelValue: { type: String, default: '' }
@@ -8,22 +8,32 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue'])
 
 const editorRef = ref(null)
+let isComposing = false
+
+onMounted(() => {
+  if (editorRef.value) {
+    editorRef.value.innerHTML = props.modelValue || ''
+  }
+})
+
+// 仅在外部分配新值时更新（不干扰用户当前输入）
+watch(() => props.modelValue, (val) => {
+  if (!editorRef.value || isComposing) return
+  const el = editorRef.value
+  if (el.innerHTML !== val && !el.isSameNode(document.activeElement)) {
+    el.innerHTML = val || ''
+  }
+})
+
+function onInput() {
+  emit('update:modelValue', editorRef.value?.innerHTML || '')
+}
 
 function execCmd(cmd, val) {
   document.execCommand(cmd, false, val || null)
   editorRef.value?.focus()
-  emitContent()
+  onInput()
 }
-
-function emitContent() {
-  emit('update:modelValue', editorRef.value?.innerHTML || '')
-}
-
-watch(() => props.modelValue, (val) => {
-  if (editorRef.value && editorRef.value.innerHTML !== val) {
-    editorRef.value.innerHTML = val
-  }
-})
 </script>
 
 <template>
@@ -41,9 +51,10 @@ watch(() => props.modelValue, (val) => {
       ref="editorRef"
       class="editor-area"
       contenteditable="true"
-      :innerHTML="modelValue"
-      @input="emitContent"
-      @paste="emitContent"
+      @input="onInput"
+      @paste="onInput"
+      @compositionstart="isComposing = true"
+      @compositionend="isComposing = false"
       placeholder="写下你的留言…"
     ></div>
   </div>
@@ -57,12 +68,10 @@ watch(() => props.modelValue, (val) => {
   background: rgba(255, 255, 255, 0.5);
   transition: all 0.2s;
 }
-
 .editor:focus-within {
   border-color: var(--cyan);
   box-shadow: 0 0 12px rgba(96, 165, 250, 0.08);
 }
-
 .editor-toolbar {
   display: flex;
   align-items: center;
@@ -71,34 +80,22 @@ watch(() => props.modelValue, (val) => {
   border-bottom: 1px solid var(--border-color);
   background: rgba(245, 240, 255, 0.5);
 }
-
 .tool-btn {
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  background: transparent;
-  color: var(--text-tertiary);
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 0.85rem;
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+  border: none; background: transparent;
+  color: var(--text-tertiary); border-radius: 6px;
+  cursor: pointer; font-size: 0.85rem;
   transition: all 0.15s;
 }
-
 .tool-btn:hover {
   background: rgba(244, 114, 182, 0.06);
   color: var(--text-primary);
 }
-
 .tool-sep {
-  width: 1px;
-  height: 18px;
-  background: var(--border-color);
-  margin: 0 0.25rem;
+  width: 1px; height: 18px;
+  background: var(--border-color); margin: 0 0.25rem;
 }
-
 .editor-area {
   min-height: 130px;
   padding: 0.75rem 0.875rem;
@@ -107,17 +104,14 @@ watch(() => props.modelValue, (val) => {
   font-size: 0.85rem;
   line-height: 1.7;
 }
-
 .editor-area:empty::before {
   content: attr(placeholder);
   color: var(--text-tertiary);
 }
-
 .editor-area :deep(ul),
 .editor-area :deep(ol) {
   padding-left: 1.5rem;
 }
-
 .editor-area :deep(a) {
   color: var(--cyan);
   text-decoration: underline;
