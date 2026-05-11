@@ -1,9 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
-// 部署 Worker 后把地址填在这里
-const WORKER_URL = 'https://acgweb-api.your-account.workers.dev'
-
 const MOCK = [
   {
     id: 1,
@@ -28,7 +25,7 @@ export const useMessagesStore = defineStore('messages', () => {
 
   async function fetchMessages() {
     try {
-      const res = await fetch(WORKER_URL)
+      const res = await fetch('/api/messages')
       if (!res.ok) throw new Error('API 不可用')
       const text = await res.text()
       if (text.startsWith('<!DOCTYPE')) throw new Error('收到 HTML')
@@ -53,7 +50,7 @@ export const useMessagesStore = defineStore('messages', () => {
       return newMsg
     }
 
-    const res = await fetch(WORKER_URL, {
+    const res = await fetch('/api/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(msg)
