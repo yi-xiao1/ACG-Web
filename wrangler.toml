@@ -1,0 +1,6 @@
+name = "acgweb"
+pages_build_output_dir = "./dist"
+
+[[kv_namespaces]]
+binding = "MESSAGES"
+id = "1efb59538e2c454892943f393f712375"
