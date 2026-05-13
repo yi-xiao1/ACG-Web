@@ -12,14 +12,17 @@ npm run preview   # Preview production build
 
 ## Architecture
 
-### Data Layer (no backend)
+### Data Layer
 All content lives in `src/data/` as Markdown files organized by type (`anime/`, `manga/`, `novel/`, `game/`). Each `.md` file uses YAML frontmatter with fields: `title`, `cover`, `tags`, `publishDate`, `url`, `type`, `id`. The body is the author's commentary.
 
-At build time, `import.meta.glob('/src/data/**/*.md', { as: 'raw', eager: true })` in `src/stores/works.js` loads all markdown files as raw strings. `parseFrontmatter()` in `src/composables/useWorks.js` parses frontmatter with a simple regex — no gray-matter dependency needed. The body is rendered with `marked` on detail pages.
+At build time, `import.meta.glob('/src/data/**/*.md', { query: '?raw', import: 'default', eager: true })` in `src/stores/works.js` loads all markdown files as raw strings. `parseFrontmatter()` in `src/composables/useWorks.js` parses frontmatter with a simple regex — no gray-matter dependency needed. The body is rendered with `marked` on detail pages.
+
+### Serverless API (Pages Functions)
+`functions/api/messages.js` is a Cloudflare Pages Function that handles GET/POST for the message board. Data is stored in a Cloudflare KV namespace (`MESSAGES`) bound to the Pages project.
 
 ### State Management (Pinia)
 - **`works.js`** — global works store: loads and indexes all markdown data, provides computed collections (`animeWorks`, `mangaWorks`, etc.), search, and lookup by type+id.
-- **`messages.js`** — message board store: mock API with `fetchMessages()` and `postMessage()`. No backend—data lives in memory only.
+- **`messages.js`** — message board store: fetches data from `/api/messages` (Cloudflare Pages Function backed by KV). Falls back to mock data when the API is unavailable (local dev).
 
 ### Routing (Vue Router)
 | Path | Page |
@@ -64,8 +67,10 @@ Hidden page at `/admin?psw=123` (`src/views/AdminView.vue`) for CRUD operations.
 ### Deployment (Cloudflare Pages)
 - Build command: `npm run build`
 - Build output: `dist/`
+- Deploy command: `true` (must be set, otherwise use default)
 - Node.js version: 22+
 - No `_redirects` needed — Cloudflare Pages handles SPA routing automatically
+- KV binding required for message board: variable name `MESSAGES`, linked to a KV namespace
 
 ### Vite Notes
 - Uses Vite 6.x with Rollup (stable). Do not upgrade to Vite 7+ — Rolldown (the new Rust bundler in Vite 7/8) has a known issue with `import.meta.glob({ as: 'raw' })` on `.md` files, causing `PARSE_ERROR: "Cannot assign to this expression"`.

@@ -67,22 +67,76 @@ describe/
 
 ## 快速开始
 
-### 本地开发
+### 环境要求
+
+- **Node.js** 18+（推荐 22+）
+- **npm** 9+（Node.js 自带）
+
+### 本地运行
 
 ```bash
+# 1. 进入项目目录
 cd describe
+
+# 2. 安装依赖
 npm install
+
+# 3. 启动开发服务器
 npm run dev
 ```
 
 启动后在浏览器打开 `http://localhost:5173`。
 
-### 生产构建
+
+## 服务器部署指南（Cloudflare Pages）
+
+本站推荐部署方式，免费、自带 CDN、支持 Pages Functions（留言板需要）。
+
+### 第一步：创建 GitHub 仓库
+
+1. 在 GitHub 新建一个仓库（可以是私有的）
+2. 将代码推送到 GitHub：
 
 ```bash
-npm run build       # 构建到 dist/
-npm run preview     # 预览构建结果
+git remote add origin https://github.com/你的用户名/仓库名.git
+git push -u origin main
 ```
+
+### 第二步：在 Cloudflare Pages 连接仓库
+
+1. 登录 [Cloudflare Dashboard](https://dash.cloudflare.com)
+2. 左侧菜单 →**Compute**→ **Workers & Pages** → 右上角**Create application**→底部的**Get started**
+3. 点击 Git repository的**Get started**
+4. 授权 GitHub 账号，选择刚才创建的仓库
+5. 在 **Set up builds and deployments** 页面配置：
+
+| 配置项 | 值 |
+|--------|-----|
+| Framework preset | **Vue** |
+
+6. 点击 **Save and Deploy**
+7. 等待部署完成，Cloudflare 会分配一个 `xxxx.pages.dev` 域名
+
+### 第三步：配置 KV 命名空间（留言板功能）
+
+1. 在 Cloudflare Dashboard，左侧菜单 → **Compute**→**Storage & databases** → **Workers KV**
+2. 点击 **Create Instance**，名称输入 `messages`，点击 **Add**
+3. 进入 **Workers & Pages** → 你的 Pages 项目 → **Settings** → **Bindings**
+4. 点击 **Add binding**：
+
+| 字段 | 值 |
+|------|-----|
+| Binding name | `MESSAGES` |
+| Namespace | 选择刚创建的 `messages` |
+
+5. 点击 **Deploy** 重新部署项目
+
+### 第四步：配置自定义域名（可选）
+
+1. 在 Pages 项目 → **Settings** → **Domains**
+2. 输入你的域名，按提示添加 DNS 记录
+3. Cloudflare 会自动配置 SSL 证书
+
 
 ## 页面路由
 
@@ -97,7 +151,7 @@ npm run preview     # 预览构建结果
 
 ## 作品数据管理
 
-### 添加作品
+### 添加作品（可在网页直接添加）
 
 所有作品数据以 Markdown 文件形式存放在 `src/data/` 目录下，按分类存放：
 
@@ -161,7 +215,7 @@ public/covers/
 - **封面上传**: 选择图片自动上传到对应分类目录
 - **正文编辑**: 支持 Markdown 语法快捷工具栏
 
-管理后台通过 GitHub Contents API 直接提交文件到仓库，需要配置 GitHub Personal Access Token（`repo` 权限）。Token 保存在浏览器本地存储中。
+管理后台通过 GitHub Contents API 直接提交文件到仓库，需要配置 **GitHub Personal Access Token**（`repo` 权限）。Token 保存在浏览器本地存储中。
 
 ## Pages CMS
 
@@ -172,31 +226,3 @@ public/covers/
 3. 变更会自动提交到 GitHub 仓库
 
 注意：`.pages.yml` 中不能使用 YAML 锚点，Pages CMS 解析器可能不支持。
-
-## Cloudflare 部署
-
-### Pages 构建设置
-
-| 配置项 | 值 |
-|--------|-----|
-| Build command | `npm run build` |
-| Build output | `dist` |
-| Deploy command | `true` |
-
-### KV 绑定（留言板）
-
-1. 在 Cloudflare Dashboard 创建一个 KV namespace（如 `messages`）
-2. 在 Pages 项目 Settings → Bindings 中添加 KV 绑定：
-   - 变量名：`MESSAGES`
-   - 选择刚创建的 namespace
-3. 重新部署项目
-
-### 环境变量
-
-留言板使用 Cloudflare KV 存储数据，无需额外环境变量。
-
-## 注意事项
-
-- **Vite 版本**: 使用 Vite 6.x（Rollup），不要升级到 Vite 7+。Vite 7/8 使用 Rolldown（Rust 打包器），对 `import.meta.glob` + `as: 'raw'` 存在兼容性问题。
-- **密码安全**: 管理后台密码硬编码在源码中，仅供简单保护，不能用于生产环境的安全验证。
-- **仓库权限**: 建议使用私有 GitHub 仓库，Token 不要写死在代码中。
